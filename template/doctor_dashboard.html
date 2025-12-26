@@ -1,0 +1,102 @@
+{% extends "base_admin.html" %}
+{% block title %}Doctor Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+  <div class="mb-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h4 class="mb-0">Dr. {{ doctor.name }}</h4>
+      <div class="small text-muted">{{ doctor.specialization }}</div>
+    </div>
+    <div>
+      <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-3">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <div class="card p-3 mb-3">
+    <h5 class="mb-2">Assigned Appointments</h5>
+    <div style="max-height:640px; overflow:auto;">
+      <table class="table table-sm">
+        <thead>
+          <tr><th>#</th><th>Patient</th><th>Date</th><th>Time</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for a in appointments %}
+          <tr>
+            <td>{{ a.id }}</td>
+            <td>
+              {{ a.patient.name if a.patient else a.patient_id }}
+              <div class="small text-muted">{{ a.patient.contact if a.patient else '' }}</div>
+            </td>
+            <td>{{ a.date }}</td>
+            <td>{{ a.time.strftime('%H:%M') if a.time else '' }}</td>
+            <td>
+              {% if a.status == 'Booked' %}
+                <span class="badge bg-primary">Booked</span>
+              {% elif a.status == 'Completed' %}
+                <span class="badge bg-success">Completed</span>
+              {% else %}
+                <span class="badge bg-danger">{{ a.status }}</span>
+              {% endif %}
+            </td>
+            <td style="min-width:360px;">
+
+              <a class="btn btn-sm btn-outline-primary mb-1 ms-1"
+   href="{{ url_for('doctor_view_patient_records', patient_id=a.patient_id) }}">
+  View Records
+</a>
+
+              {% if a.treatment %}
+                <div class="mb-1">
+                  <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#viewTreat-{{ a.id }}">View Treatment</button>
+                </div>
+                <div class="collapse mb-1" id="viewTreat-{{ a.id }}">
+                  <div class="card p-2 small">
+                    <strong>Diagnosis:</strong> {{ a.treatment.diagnosis or '—' }}<br/>
+                    <strong>Prescription:</strong> {{ a.treatment.prescription or '—' }}<br/>
+                    <strong>Notes:</strong> {{ a.treatment.notes or '—' }}
+                  </div>
+                </div>
+              {% endif %}
+
+              <div>
+                <form action="{{ url_for('doctor_complete_appointment', appt_id=a.id) }}" method="post" class="row g-1">
+                  <div class="col-12">
+                    <input name="diagnosis" class="form-control form-control-sm" placeholder="Diagnosis (short)">
+                  </div>
+                  <div class="col-12">
+                    <input name="prescription" class="form-control form-control-sm" placeholder="Prescription (short)">
+                  </div>
+                  <div class="col-12">
+                    <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Notes / follow-up"></textarea>
+                  </div>
+                  <div class="col-12">
+                    <button class="btn btn-sm btn-success w-100 mt-1" type="submit">Mark Completed & Save</button>
+                  </div>
+                </form>
+              </div>
+
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center">No assigned appointments.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base_login.html" %}
+
+{% block title %}Admin Login{% endblock %}
+{% block heading %}Admin Login{% endblock %}
+
+{% block form %}
+<form action="/admin/dashboard" method="post">
+    <div class="mb-3">
+        <label for="username" class="form-label">Admin Username</label>
+        <input type="text" class="form-control" id="username" name="username" placeholder="Enter username" required>
+    </div>
+    <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <input type="password" class="form-control" id="password" name="password" placeholder="Enter password" required>
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Login</button>
+</form>
+{% endblock %}

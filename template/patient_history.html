@@ -1,0 +1,46 @@
+{% extends "base_admin.html" %}
+{% block title %}Patient History{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+  <div class="mb-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h4 class="mb-0">{{ patient.name }}</h4>
+      <div class="small text-muted">Username: {{ patient.username }} • Contact: {{ patient.contact }}</div>
+    </div>
+    <div>
+      <a href="{{ url_for('doctor_dashboard') }}" class="btn btn-sm btn-outline-secondary">Back to Dashboard</a>
+    </div>
+  </div>
+
+  <div class="card p-3">
+    <h5 class="mb-3">Treatment History</h5>
+    <div style="max-height:720px; overflow:auto;">
+      <table class="table table-sm">
+        <thead><tr><th>#</th><th>Date</th><th>Doctor</th><th>Diagnosis</th><th>Prescription</th><th>Notes</th></tr></thead>
+        <tbody>
+          {% for t in treatments %}
+          <tr>
+            {% set appt = t.appointment %}
+            <td>{{ t.id }}</td>
+            <td>{{ appt.date if appt else '—' }}</td>
+            <td>
+              {% if appt and appt.doctor %}
+                Dr. {{ appt.doctor.name }}
+              {% else %}
+                {{ appt.doctor_id if appt else '—' }}
+              {% endif %}
+            </td>
+            <td>{{ t.diagnosis or '—' }}</td>
+            <td>{{ t.prescription or '—' }}</td>
+            <td>{{ t.notes or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center">No treatment records found for this patient.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,265 @@
+{% extends "base_admin.html" %}
+{% block title %}Patient Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+  <div class="mb-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h4 class="mb-0">Hi, {{ patient.name }}</h4>
+      <div class="small text-muted">Username: {{ patient.username }} • Contact: {{ patient.contact }}</div>
+    </div>
+    <div>
+      <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logout</a>
+    </div>
+  </div>
+
+  <!-- Flash -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-3">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <div class="row gx-3">
+    <!-- Left column: Search & Book -->
+    <div class="col-lg-5">
+      <div class="card p-3 mb-3">
+        <h5>Find doctors & available slots</h5>
+        <form class="row g-2 mb-2" method="get" action="{{ url_for('patient_dashboard') }}">
+          <div class="col-7">
+            <!-- replaced free-text specialization input with dropdown -->
+            <select class="form-select" name="spec">
+              <option value="">All specializations</option>
+              {% for s in specializations %}
+                <option value="{{ s }}" {% if s == query_spec %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-5">
+            <input class="form-control" name="date" type="date" value="{{ query_date }}">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary w-100" type="submit">Search</button>
+          </div>
+        </form>
+
+        {% if query_date %}
+          <div class="small text-muted mb-2">Available slots for {{ query_date }}</div>
+          {% if doctors %}
+            <div style="max-height:350px; overflow:auto;">
+              {% for d in doctors %}
+                <div class="border rounded p-2 mb-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <strong>Dr. {{ d.name }}</strong> <div class="small text-muted">{{ d.specialization }}</div>
+                    </div>
+                    <div>
+                      {% if available_map[d.id] %}
+                        <span class="small text-muted">{{ available_map[d.id]|length }} slots</span>
+                      {% else %}
+                        <span class="small text-muted">No slots</span>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  {% if available_map[d.id] %}
+                    <div class="mt-2">
+                      <form action="{{ url_for('patient_book_appointment') }}" method="post" enctype="multipart/form-data" class="row g-1">
+                        <input type="hidden" name="doctor_id" value="{{ d.id }}">
+                        <input type="hidden" name="date" value="{{ query_date }}">
+                        <div class="col-12">
+                          <label class="form-label small">Choose slot</label>
+                          <select name="time" class="form-select form-select-sm" required>
+                            <option value="">Select slot</option>
+                            {% for s in available_map[d.id] %}
+                              <option value="{{ s.strftime('%H:%M') }}">{{ s.strftime('%H:%M') }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+
+                        <div class="col-12">
+                          <label class="form-label small">Upload previous medical record (optional)</label>
+                          <input type="file" name="record" class="form-control form-control-sm">
+                        </div>
+
+                        <div class="col-12">
+                          <button class="btn btn-success w-100 btn-sm" type="submit">Book</button>
+                        </div>
+                      </form>
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="small text-muted">No doctors found for your search.</div>
+          {% endif %}
+        {% else %}
+          <div class="small text-muted">Pick a date to see available slots.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Right column: Profile & Appointments -->
+    <div class="col-lg-7">
+      <div class="card p-3 mb-3">
+        <h5>My Profile</h5>
+        <form action="{{ url_for('patient_update_profile') }}" method="post" class="row g-2">
+          <div class="col-md-6">
+            <input class="form-control" name="name" value="{{ patient.name }}" placeholder="Full name" required>
+          </div>
+          <div class="col-md-3">
+            <input class="form-control" name="age" type="number" value="{{ patient.age or '' }}" placeholder="Age">
+          </div>
+          <div class="col-md-3">
+            <input class="form-control" name="contact" value="{{ patient.contact or '' }}" placeholder="Contact">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary w-100" type="submit">Update profile</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <h5>My Appointments</h5>
+        <div style="max-height:300px; overflow:auto;">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>#</th><th>Date</th><th>Time</th><th>Doctor</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              {% for a in appointments %}
+              <tr>
+                <td>{{ a.id }}</td>
+                <td>{{ a.date }}</td>
+                <td>{{ a.time.strftime('%H:%M') if a.time else '' }}</td>
+                <td>{{ a.doctor.name if a.doctor else a.doctor_id }}</td>
+                <td>{{ a.status }}</td>
+                <td>
+                  {% if a.status == 'Booked' %}
+                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#resch-{{ a.id }}">Reschedule</button>
+
+                    <form action="{{ url_for('patient_cancel_appointment', appt_id=a.id) }}" method="post" style="display:inline;">
+                      <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Cancel appointment?')">Cancel</button>
+                    </form>
+
+                    <div class="collapse mt-2" id="resch-{{ a.id }}">
+                      <form action="{{ url_for('patient_reschedule_appointment', appt_id=a.id) }}" method="post" class="row g-1">
+                        <div class="col-6"><input type="date" name="date" class="form-control form-control-sm" required></div>
+                        <div class="col-6"><input type="time" name="time" class="form-control form-control-sm" required></div>
+                        <div class="col-12"><button class="btn btn-sm btn-primary w-100" type="submit">Save</button></div>
+                      </form>
+                    </div>
+                  {% else %}
+                    <small class="text-muted">No action</small>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="text-center">No appointments yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-3">
+        <h5>My Medical Records</h5>
+        <div style="max-height:220px; overflow:auto;">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>#</th><th>Uploaded</th><th>File</th></thead>
+            <tbody>
+              {% for r in records %}
+              <tr>
+                <td>{{ r.id }}</td>
+                <td>{{ r.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td><a href="{{ url_for('static', filename='uploads/' ~ r.filename) }}" target="_blank">{{ r.original_name or r.filename }}</a></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="3" class="text-center">No records uploaded.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <h5>My Treatments</h5>
+        <div style="max-height:220px; overflow:auto;">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Doctor</th>
+                <th>Diagnosis</th>
+                <th>Prescription</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in appointments %}
+                {% if a.treatment %}
+                <tr>
+                  <td>{{ a.treatment.id }}</td>
+                  <td>{{ a.date }}</td>
+                  <td>{{ a.doctor.name if a.doctor else a.doctor_id }}</td>
+
+                  <!-- Diagnosis column: show short text and a "View" collapse for full -->
+                  <td>
+                    <div class="small text-truncate" style="max-width:220px;">
+                      {{ a.treatment.diagnosis or '—' }}
+                    </div>
+                    <div class="mt-1">
+                      <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#treat-{{ a.id }}">View details</button>
+                    </div>
+                  </td>
+
+                  <!-- Prescription column: short preview -->
+                  <td>
+                    <div class="small text-truncate" style="max-width:200px;">
+                      {{ a.treatment.prescription or '—' }}
+                    </div>
+                  </td>
+
+                  <!-- Notes column: short preview -->
+                  <td>
+                    <div class="small text-truncate" style="max-width:200px;">
+                      {{ a.treatment.notes or '—' }}
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Collapsible full details row -->
+                <tr class="collapse" id="treat-{{ a.id }}">
+                  <td colspan="6">
+                    <div class="card p-2 small">
+                      <strong>Diagnosis:</strong><br/>
+                      <div class="mb-2">{{ a.treatment.diagnosis or '—' }}</div>
+
+                      <strong>Prescription:</strong><br/>
+                      <div class="mb-2">{{ a.treatment.prescription or '—' }}</div>
+
+                      <strong>Notes:</strong><br/>
+                      <div>{{ a.treatment.notes or '—' }}</div>
+                    </div>
+                  </td>
+                </tr>
+                {% endif %}
+              {% else %}
+              <tr><td colspan="6" class="text-center">No treatments recorded yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

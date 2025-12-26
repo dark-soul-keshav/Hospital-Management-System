@@ -1,0 +1,56 @@
+{% extends "base_admin.html" %}
+{% block title %}Appointments{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="mb-3 d-flex justify-content-between align-items-center">
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">Back to Dashboard</a>
+    <h4 class="mb-0">
+      {% if entity_type == 'doctor' %}
+        Appointments for Dr. {{ entity.name }}
+      {% else %}
+        Appointments for {{ entity.name }}
+      {% endif %}
+    </h4>
+  </div>
+
+  <div class="card p-3">
+    <div style="max-height:600px; overflow:auto;">
+      <table class="table table-sm">
+        <thead>
+          <tr><th>#</th><th>Patient</th><th>Doctor</th><th>Date</th><th>Time</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {% for a in appointments %}
+          <tr>
+            <td>{{ a.id }}</td>
+            <td>{{ a.patient.name if a.patient else a.patient_id }}</td>
+            <td>{{ a.doctor.name if a.doctor else a.doctor_id }}</td>
+            <td>{{ a.date }}</td>
+            <td>{{ a.time.strftime('%H:%M') if a.time else '' }}</td>
+            <td>{{ a.status }}</td>
+            <td>
+              <form action="{{ url_for('admin_change_appointment_status', appt_id=a.id) }}" method="post" class="d-inline">
+                <input type="hidden" name="status" value="Completed">
+                <button class="btn btn-sm btn-success" type="submit">Complete</button>
+              </form>
+
+              <form action="{{ url_for('admin_change_appointment_status', appt_id=a.id) }}" method="post" class="d-inline ms-1">
+                <input type="hidden" name="status" value="Cancelled">
+                <button class="btn btn-sm btn-danger" type="submit">Cancel</button>
+              </form>
+
+              <form action="{{ url_for('admin_delete_appointment', appt_id=a.id) }}" method="post" class="d-inline ms-1" onsubmit="return confirm('Delete appointment?');">
+                <button class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center">No appointments found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

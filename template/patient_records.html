@@ -1,0 +1,29 @@
+{% extends "base_admin.html" %}
+{% block title %}Patient Records{% endblock %}
+{% block content %}
+<div class="container-fluid p-0">
+  <div class="mb-3 d-flex justify-content-between align-items-center">
+    <h4 class="mb-0">Records — {{ patient.name }}</h4>
+    <a href="{{ url_for('doctor_dashboard') }}" class="btn btn-sm btn-outline-secondary">Back</a>
+  </div>
+
+  <div class="card p-3">
+    <div style="max-height:720px; overflow:auto;">
+      <table class="table table-sm">
+        <thead><tr><th>#</th><th>Uploaded</th><th>File</th></tr></thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td><a href="{{ url_for('static', filename='uploads/' ~ r.filename) }}" target="_blank">{{ r.original_name or r.filename }}</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-center">No records found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

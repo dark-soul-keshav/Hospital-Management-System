@@ -1,0 +1,412 @@
+{% extends "base_admin.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+  <div class="mb-3 d-flex justify-content-between align-items-center">
+    <a href="{{ url_for('home') }}" class="btn btn-sm btn-outline-secondary">Back to Home</a>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin_dashboard') }}">Refresh</a>
+      <a class="btn btn-sm btn-danger" href="{{ url_for('logout') }}">Logout</a>
+    </div>
+  </div>
+
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-3">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+
+  <div class="row mb-3 gx-3">
+    <div class="col-md-3">
+      <div class="card p-3 stats-card">
+        <div>
+          <div class="h6 text-muted">Total Doctors</div>
+          <div class="fs-4 fw-bold">{{ total_doctors }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card p-3 stats-card">
+        <div>
+          <div class="h6 text-muted">Total Patients</div>
+          <div class="fs-4 fw-bold">{{ total_patients }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card p-3 stats-card">
+        <div>
+          <div class="h6 text-muted">Total Appointments</div>
+          <div class="fs-4 fw-bold">{{ total_appointments }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card p-3 stats-card">
+        <div>
+          <div class="h6 text-muted">Upcoming Appointments</div>
+          <div class="fs-4 fw-bold">{{ upcoming_appointments }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <form class="row g-2 mb-3" method="get" action="{{ url_for('admin_dashboard') }}">
+    <div class="col-md-6">
+      <input type="text" class="form-control" name="q" placeholder="Search (doctor name / specialization / patient / username / contact)" value="{{ query }}">
+    </div>
+    <div class="col-md-3">
+      <select name="type" class="form-select">
+        <option value="doctor" {% if filter_type =='doctor' %}selected{% endif %}>Search Doctors</option>
+        <option value="patient" {% if filter_type =='patient' %}selected{% endif %}>Search Patients</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-primary w-100" type="submit">Search</button>
+    </div>
+  </form>
+
+  <div class="row">
+
+    <div class="col-lg-5">
+      <div class="card p-3 mb-3">
+        <h5 class="mb-3">Add New Doctor</h5>
+        <form action="{{ url_for('admin_add_doctor') }}" method="post" class="row g-2">
+          <div class="col-12">
+            <input class="form-control" name="name" placeholder="Doctor name" required>
+          </div>
+          <div class="col-12">
+            <input class="form-control" name="specialization" placeholder="Specialization" required>
+          </div>
+          <div class="col-12">
+            <input class="form-control" name="availability" placeholder="Availability (free text, optional)">
+          </div>
+          <div class="col-12">
+            <input class="form-control" name="contact" placeholder="Contact">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label small">Weekly availability (check day + set start/end)</label>
+            <div class="mb-2 small text-muted">Times use 24-hour format. e.g. Start 09:00 End 17:00</div>
+            {% set days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+            <div class="row g-1">
+              {% for i in range(7) %}
+              <div class="col-12 d-flex align-items-center gap-2">
+                <div class="form-check me-2">
+                  <input class="form-check-input" type="checkbox" id="day_chk_{{ i }}" name="day_{{ i }}_enabled" value="1">
+                  <label class="form-check-label small" for="day_chk_{{ i }}">{{ days[i] }}</label>
+                </div>
+                <input class="form-control form-control-sm" type="time" name="day_{{ i }}_start" placeholder="Start">
+                <input class="form-control form-control-sm" type="time" name="day_{{ i }}_end" placeholder="End">
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="col-6">
+            <input class="form-control" name="username" placeholder="Username" required>
+          </div>
+          <div class="col-6">
+            <input class="form-control" name="password" placeholder="Password" required>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-success w-100" type="submit">Add Doctor</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <h5 class="mb-2">Doctors</h5>
+        <div style="max-height: 460px; overflow:auto;">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th style="width:56px">#</th><th>Name</th><th>Spec</th><th>Avail</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in doctors %}
+              <tr>
+                <td>{{ d.id }}</td>
+                <td>{{ d.name }}</td>
+                <td>{{ d.specialization }}</td>
+                <td style="min-width:160px;">
+                  {% if d.availabilities and d.availabilities.count() > 0 %}
+                    {% set daynames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+                    <div class="small text-muted">
+                      {% for av in d.availabilities %}
+                        <div>{{ daynames[av.day_of_week] }}: {{ av.start_time.strftime('%H:%M') }}–{{ av.end_time.strftime('%H:%M') }}</div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="small text-muted">No weekly slots</div>
+                  {% endif %}
+                </td>
+                <td style="min-width:260px;">
+                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#editDoc-{{ d.id }}">Edit</button>
+
+                  <form action="{{ url_for('admin_delete_doctor', doc_id=d.id) }}" method="post" style="display:inline;">
+                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete doctor?')">Delete</button>
+                  </form>
+
+                  <a class="btn btn-sm btn-outline-info ms-1" href="{{ url_for('admin_view_doctor_appointments', doc_id=d.id) }}">View Appts</a>
+
+                  <div class="collapse mt-2" id="editDoc-{{ d.id }}">
+                    <form action="{{ url_for('admin_edit_doctor', doc_id=d.id) }}" method="post" class="row g-1 p-2">
+                      <div class="col-12">
+                        <input class="form-control form-control-sm" name="name" value="{{ d.name }}" required>
+                      </div>
+                      <div class="col-12">
+                        <input class="form-control form-control-sm" name="specialization" value="{{ d.specialization }}" required>
+                      </div>
+                      <div class="col-12">
+                        <input class="form-control form-control-sm" name="availability" value="{{ d.availability }}">
+                      </div>
+                      <div class="col-12">
+                        <input class="form-control form-control-sm" name="contact" value="{{ d.contact }}">
+                      </div>
+
+                      <!-- Edit availability: show current slots (optional) and allow replacing -->
+                      <div class="col-12">
+                        <div class="small text-muted mb-1">(To change weekly slots, edit below — submitting will replace existing slots.)</div>
+                        {% set daynames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+                        {% for i in range(7) %}
+                          {# find first availability matching this weekday (no break in Jinja) #}
+                          {% set existing = (d.availabilities | selectattr('day_of_week', 'equalto', i) | list | first) %}
+                          <div class="d-flex gap-2 mb-1">
+                            <div class="form-check me-2">
+                              <input class="form-check-input" type="checkbox" name="day_{{ i }}_enabled" value="1" id="edit_day_{{ d.id }}_{{ i }}"
+                                {% if existing %}checked{% endif %}>
+                              <label class="form-check-label small" for="edit_day_{{ d.id }}_{{ i }}">{{ daynames[i] }}</label>
+                            </div>
+                            <input class="form-control form-control-sm" type="time" name="day_{{ i }}_start" value="{{ existing.start_time.strftime('%H:%M') if existing else '' }}">
+                            <input class="form-control form-control-sm" type="time" name="day_{{ i }}_end" value="{{ existing.end_time.strftime('%H:%M') if existing else '' }}">
+                          </div>
+                        {% endfor %}
+                      </div>
+
+                      <div class="col-12">
+                        <input class="form-control form-control-sm" name="username" value="{{ d.username }}" required>
+                      </div>
+                      <div class="col-12">
+                        <input class="form-control form-control-sm" name="password" placeholder="New password (leave empty to keep)">
+                      </div>
+                      <div class="col-12">
+                        <button class="btn btn-sm btn-primary w-100" type="submit">Save</button>
+                      </div>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-center">No doctors found.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card p-3 mb-3">
+        <h5 class="mb-2">Recent Patients</h5>
+        <div style="max-height:160px; overflow:auto;">
+          <table class="table table-sm mb-0">
+            <thead><tr><th style="width:56px">#</th><th>Name</th><th>Username / Action</th></tr></thead>
+            <tbody>
+  {% for p in patients %}
+  <tr>
+    <td>{{ p.id }}</td>
+    <td>{{ p.name }}</td>
+    <td>
+      <div class="d-flex align-items-center gap-2">
+        <div>
+          <div>{{ p.username }}</div>
+          <div class="small text-muted">{{ p.contact or '' }}</div>
+        </div>
+        <div class="ms-auto">
+          <a class="btn btn-sm btn-outline-info" href="{{ url_for('admin_view_patient_appointments', patient_id=p.id) }}">View Appts</a>
+          <button class="btn btn-sm btn-outline-primary ms-1" data-bs-toggle="collapse" data-bs-target="#editPatient-{{ p.id }}">Edit</button>
+        </div>
+      </div>
+
+      <div class="collapse mt-2" id="editPatient-{{ p.id }}">
+        <form action="{{ url_for('admin_edit_patient', patient_id=p.id) }}" method="post" class="row g-1 p-2">
+          <div class="col-12">
+            <input class="form-control form-control-sm" name="name" value="{{ p.name }}" placeholder="Full name" required>
+          </div>
+          <div class="col-6">
+            <input class="form-control form-control-sm" name="age" value="{{ p.age if p.age is not none else '' }}" type="number" min="0" placeholder="Age">
+          </div>
+          <div class="col-6">
+            <select class="form-select form-select-sm" name="gender">
+              <option value="" {% if not p.gender %}selected{% endif %}>Select gender</option>
+              <option value="Male" {% if p.gender=='Male' %}selected{% endif %}>Male</option>
+              <option value="Female" {% if p.gender=='Female' %}selected{% endif %}>Female</option>
+              <option value="Other" {% if p.gender=='Other' %}selected{% endif %}>Other</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <input class="form-control form-control-sm" name="contact" value="{{ p.contact or '' }}" placeholder="Contact">
+          </div>
+          <div class="col-12">
+            <input class="form-control form-control-sm" name="email" value="{{ p.email or '' }}" placeholder="Email">
+          </div>
+          <div class="col-12">
+            <input class="form-control form-control-sm" name="username" value="{{ p.username }}" placeholder="Username" required>
+          </div>
+          <div class="col-12">
+            <input class="form-control form-control-sm" name="password" placeholder="New password (leave empty to keep current)">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-sm btn-primary w-100" type="submit">Save</button>
+          </div>
+        </form>
+      </div>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="3" class="text-center">No patients.</td></tr>
+  {% endfor %}
+</tbody>
+
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <h5 class="mb-3">Create Appointment</h5>
+        <form action="{{ url_for('admin_create_appointment') }}" method="post" class="row g-2">
+          <div class="col-md-6">
+            <select class="form-select" name="patient_id" required>
+              <option value="">Select patient</option>
+              {% for p in patients %}
+                <option value="{{ p.id }}">{{ p.name }} ({{ p.username }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <select class="form-select" name="doctor_id" required>
+              <option value="">Select doctor</option>
+              {% for d in doctors %}
+                <option value="{{ d.id }}">{{ d.name }} — {{ d.specialization }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <input class="form-control" type="date" name="date" required>
+          </div>
+          <div class="col-md-6">
+            <input class="form-control" type="time" name="time" required>
+          </div>
+
+          <div class="col-12">
+            <button class="btn btn-primary w-100" type="submit">Create Appointment</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card p-3">
+        <h5 class="mb-2">Recent Appointments</h5>
+        <div style="max-height:420px; overflow:auto;">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:56px">#</th><th>Patient</th><th>Doctor</th><th>Date</th><th>Time</th><th>Status</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in appointments %}
+              <tr>
+                <td>{{ a.id }}</td>
+                <td>{{ a.patient.name if a.patient else a.patient_id }}</td>
+                <td>{{ a.doctor.name if a.doctor else a.doctor_id }}</td>
+                <td>{{ a.date }}</td>
+                <td>{{ a.time.strftime('%H:%M') if a.time else '' }}</td>
+                <td>
+                  {% if a.status == 'Booked' %}
+                    <span class="badge bg-primary">{{ a.status }}</span>
+                  {% elif a.status == 'Completed' %}
+                    <span class="badge bg-success">{{ a.status }}</span>
+                  {% else %}
+                    <span class="badge bg-danger">{{ a.status }}</span>
+                  {% endif %}
+                </td>
+                <td style="min-width:300px;">
+                  <!-- Status buttons -->
+                  <div class="d-flex gap-1 mb-1">
+                    <form action="{{ url_for('admin_change_appointment_status', appt_id=a.id) }}" method="post" class="d-inline">
+                      <input type="hidden" name="status" value="Completed">
+                      <button class="btn btn-sm btn-success" type="submit">Complete</button>
+                    </form>
+                    <form action="{{ url_for('admin_change_appointment_status', appt_id=a.id) }}" method="post" class="d-inline">
+                      <input type="hidden" name="status" value="Cancelled">
+                      <button class="btn btn-sm btn-danger" type="submit">Cancel</button>
+                    </form>
+                  </div>
+
+                  <div class="collapse" id="editAppt-{{ a.id }}">
+                    <form action="{{ url_for('admin_edit_appointment', appt_id=a.id) }}" method="post" class="row g-1">
+                      <div class="col-6">
+                        <input type="date" name="date" class="form-control form-control-sm" value="{{ a.date }}">
+                      </div>
+                      <div class="col-6">
+                        <input type="time" name="time" class="form-control form-control-sm" value="{{ a.time.strftime('%H:%M') if a.time else '' }}">
+                      </div>
+                      <div class="col-6">
+                        <select name="doctor_id" class="form-select form-select-sm">
+                          <option value="">Keep doctor</option>
+                          {% for d in doctors %}
+                            <option value="{{ d.id }}" {% if a.doctor and a.doctor.id==d.id %}selected{% endif %}>{{ d.name }} — {{ d.specialization }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="col-6">
+                        <select name="patient_id" class="form-select form-select-sm">
+                          <option value="">Keep patient</option>
+                          {% for p in patients %}
+                            <option value="{{ p.id }}" {% if a.patient and a.patient.id==p.id %}selected{% endif %}>{{ p.name }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="col-12">
+                        <button class="btn btn-sm btn-outline-primary w-100" type="submit">Save changes</button>
+                      </div>
+                    </form>
+                  </div>
+
+                  <div class="d-flex gap-1 mt-1">
+                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#editAppt-{{ a.id }}">Edit</button>
+
+                    <form action="{{ url_for('admin_delete_appointment', appt_id=a.id) }}" method="post" style="display:inline;">
+                      <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete appointment?')">Delete</button>
+                    </form>
+
+                    <a class="btn btn-sm btn-outline-info" href="{{ url_for('admin_view_patient_appointments', patient_id=a.patient_id) }}">Patient Appts</a>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-center">No appointments yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
